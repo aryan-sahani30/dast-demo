@@ -29,13 +29,13 @@ jobs:
 
 
       - name: Install and Run Nuclei
-      run: |
-        curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
-          | grep "browser_download_url.*linux_amd64.zip" \
-          | cut -d '"' -f 4 | wget -i -
-        unzip -o -qq nuclei-*-linux_amd64.zip
-        chmod +x nuclei
-        ./nuclei -u http://localhost:8080 -json -o nuclei.json
+        run: |
+          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+            | grep "browser_download_url.*linux_amd64.zip" \
+            | cut -d '"' -f 4 | wget -i -
+          unzip -o -qq nuclei-*-linux_amd64.zip
+          chmod +x nuclei
+          ./nuclei -u http://localhost:8080 -json -o nuclei.json
 
 
 
