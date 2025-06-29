@@ -1,0 +1,39 @@
+name: DAST Scan with ZAP and Nuclei
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Start Mutillidae Container
+        run: |
+          docker run -d -p 8080:80 --name mutillidae citizenstig/dvwa
+          sleep 20
+
+      - name: Run OWASP ZAP Full Scan
+        run: |
+          docker pull ghcr.io/zaproxy/zap-full-scan
+          docker run -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zap-full-scan             -t http://localhost:8080             -r zap_report.html             -J zap_report.json             -d
+
+      - name: Install and Run Nuclei
+        run: |
+          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest             | grep "browser_download_url.*linux_amd64.zip"             | cut -d '"' -f 4 | wget -i -
+          unzip nuclei-*-linux_amd64.zip
+          chmod +x nuclei
+          ./nuclei -u http://localhost:8080 -json -o nuclei.json
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dast-reports
+          path: |
+            zap_report.html
+            zap_report.json
+            nuclei.json
