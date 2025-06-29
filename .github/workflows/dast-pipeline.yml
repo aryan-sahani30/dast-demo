@@ -17,10 +17,12 @@ jobs:
           docker run -d -p 8080:80 --name mutillidae citizenstig/dvwa
           sleep 20
 
-      - name: Run OWASP ZAP Full Scan
-        run: |
-          docker pull ghcr.io/zaproxy/zap-full-scan
-          docker run -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zap-full-scan             -t http://localhost:8080             -r zap_report.html             -J zap_report.json             -d
+      - name: Run ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: 'http://localhost:8080'
+          fail_action: true
+
 
       - name: Install and Run Nuclei
         run: |
