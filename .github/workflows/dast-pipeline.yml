@@ -30,10 +30,11 @@ jobs:
 
       - name: Install and Run Nuclei
         run: |
-          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest             | grep "browser_download_url.*linux_amd64.zip"             | cut -d '"' -f 4 | wget -i -
-          unzip nuclei-*-linux_amd64.zip
+          curl -LO https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_2.9.9_linux_amd64.zip
+          unzip nuclei_2.9.9_linux_amd64.zip
           chmod +x nuclei
           ./nuclei -u http://localhost:8080 -json -o nuclei.json
+
 
       - name: Upload Reports
         uses: actions/upload-artifact@v4
