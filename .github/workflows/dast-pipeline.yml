@@ -3,11 +3,11 @@ name: DAST Scan with ZAP and Nuclei (Authenticated)
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
 
 permissions:
-  contents: write # Needed for uploading SARIF reports to GitHub Security tab
-  issues: write # Not directly used by ZAP scan, but kept from original script
+  contents: write
+  issues: write
 
 jobs:
   dast:
@@ -19,55 +19,36 @@ jobs:
 
       - name: Start OWASP Juice Shop Container
         run: |
-          # Start the OWASP Juice Shop container.
-          # The application will be accessible on port 8080 on the GitHub Actions runner.
           docker run -d -p 8080:3000 --name juice-shop bkimminich/juice-shop
           echo "Waiting for Juice Shop to start..."
-          # Give Juice Shop enough time to fully initialize and be ready for requests.
           sleep 30
           echo "Juice Shop should be running on http://localhost:8080"
 
       - name: Create ZAP Automation Plan for Authenticated Scan
         id: create_zap_plan
         run: |
-          # Define the target URL for Juice Shop
           TARGET_URL="http://localhost:8080"
-          # Define the output SARIF report file name
           REPORT_FILE="zap-report.sarif"
 
-          # Create the ZAP Automation Framework YAML plan dynamically.
-          # In a real-world scenario, you might have this file pre-committed
-          # to your repository and just reference it.
-          # This plan defines how ZAP will authenticate, spider, and actively scan.
           cat << EOF > zap-automation-plan.yaml
           ---
           env:
             contexts:
               - name: "JuiceShopContext"
-                # Define the URLs that belong to this application context
                 urls:
                   - "${TARGET_URL}.*"
                 authentication:
-                  # Use form-based authentication for Juice Shop
                   method: "formBasedAuthentication"
-                  # The URL of the login page
                   loginPageUrl: "${TARGET_URL}/#/login"
-                  # The HTTP POST request used for login
                   loginRequest: "POST ${TARGET_URL}/rest/user/login"
-                  # The data payload for the login request, using ZAP's placeholders
-                  # for username and password.
-                  # IMPORTANT: For production, use GitHub Secrets for credentials!
                   loginRequestData: "email={%username%}&password={%password%}"
                 users:
                   - name: "adminuser"
                     credentials:
-                      # Default Juice Shop admin credentials (for demonstration only)
                       username: "admin@juice-sh.op"
                       password: "admin"
             parameters:
-              # Fail the ZAP job if any error occurs during the scan
               failOnError: true
-              # Do not fail the ZAP job if only warnings are found
               failOnWarning: false
           jobs:
             - name: "authenticate"
@@ -79,51 +60,46 @@ jobs:
               type: "spider"
               parameters:
                 context: "JuiceShopContext"
-                user: "adminuser" # Spider as the authenticated user
+                user: "adminuser"
             - name: "activeScan"
               type: "activeScan"
               parameters:
                 context: "JuiceShopContext"
-                user: "adminuser" # Active scan as the authenticated user
-                maxScanDuration: 10 # minutes, adjust based on application size and complexity
+                user: "adminuser"
+                maxScanDuration: 10
             - name: "report"
               type: "report"
               parameters:
-                template: "sarif-json" # Generate SARIF format for GitHub Security tab
-                reportDir: "." # Output report to the current working directory
+                template: "sarif-json"
+                reportDir: "."
                 reportName: "${REPORT_FILE}"
           EOF
           echo "ZAP Automation Plan created."
 
       - name: Run ZAP Authenticated Scan
-        # Use the official ZAP Docker image
-        # Mount the current directory to /zap/wrk inside the container
-        # so ZAP can read the automation plan and write the report.
         run: |
+          ZAP_DOCKER_IMAGE="owasp/zap2docker-stable:2.14.0"
+
+          echo "Attempting to pull ${ZAP_DOCKER_IMAGE} image..."
+          docker pull "${ZAP_DOCKER_IMAGE}" || { echo "Failed to pull ZAP Docker image. Please check Docker Hub status or network connectivity."; exit 1; }
+          echo "Image pulled successfully."
+
           docker run --rm \
             -v $(pwd):/zap/wrk:rw \
-            owasp/zap2docker-stable zap.sh -cmd -autorun /zap/wrk/zap-automation-plan.yaml
+            "${ZAP_DOCKER_IMAGE}" zap.sh -cmd -autorun /zap/wrk/zap-automation-plan.yaml
 
           echo "ZAP authenticated scan completed."
 
       - name: Upload ZAP SARIF Report to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: zap-report.sarif # The SARIF report generated by ZAP
-          category: dast-owasp-zap-authenticated # A unique identifier for this scan type
-
-      # The original Nuclei step is not included here as the request focused on ZAP authentication.
-      # If you still need Nuclei, you would add its steps here.
-      # - name: Run Nuclei Scan
-      #   ...
+          sarif_file: zap-report.sarif
+          category: dast-owasp-zap-authenticated
 
       - name: Upload Other Reports (if any)
         uses: actions/upload-artifact@v4
         with:
           name: other-dast-reports
           path: |
-            # If ZAP also generates HTML/JSON reports, list them here.
-            # E.g., zap-report.html
-            # E.g., zap-report.json
-            # nuclei.json # If you integrate Nuclei separately
-          retention-days: 5 # Optional: specify how long to keep the artifact
+            # nuclei.json
+          retention-days: 5
