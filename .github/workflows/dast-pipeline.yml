@@ -16,10 +16,10 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Start Mutillidae Container
+      - name: Start OWASP Juice Shop Container
         run: |
-          docker run -d -p 8080:80 --name mutillidae citizenstig/dvwa
-          sleep 20
+          docker run -d -p 8080:3000 --name juice-shop bkimminich/juice-shop
+          sleep 30
 
       - name: Run ZAP Full Scan
         uses: zaproxy/action-full-scan@v0.12.0
